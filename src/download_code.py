@@ -3,6 +3,7 @@ import os
 import re
 import json
 import datetime
+from urllib.parse import urljoin
 from bs4 import BeautifulSoup
 
 
@@ -36,7 +37,7 @@ def fetch_release_points():
 
 	return releases
 
-def update_release_register():
+def sync_release_register():
 	# Check releases.json file
 	saved_releases = json.loads(open("releases.json", "r").read())
 	# Get the latest releases from web
@@ -51,9 +52,25 @@ def update_release_register():
 		json.dump(latest_releases, f, indent=4)
 	return latest_releases
 
+def update_release_register(id):
+	# Check releases.json file
+	releases = json.loads(open("releases.json", "r").read())
+	releases[id]["synced"] = True
+	# Write JSON file 
+	with open("releases.json", "w") as f:
+		json.dump(releases, f, indent=4)
 
-def download_code(download_url, release_id):
-	print(f"Downloading US Code {download_url}...")
+
+def download_code(link, release_id):
+	# Get the download link
+	print("Fetching US Code download link...")
+	response = requests.get(link)
+	soup = BeautifulSoup(response.content, "html.parser")
+	selector = "#content > div > div > div.uscitemlist > div:nth-child(1) > div.itemdownloadlinks > a:nth-child(2)"
+	html_link = soup.select(selector)[0]
+	download_slug = html_link.get("href")
+	download_url = urljoin(link, download_slug)
+	print(f"Downloading US Code {download_slug}...")
 	response = requests.get(download_url)
 	with open(f"storage/{release_id}.zip", "wb") as f:
 		f.write(response.content)

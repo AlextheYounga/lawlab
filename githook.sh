@@ -1,12 +1,14 @@
+commit_msg=$1
+description=$2
+
 source .env
 cd USC_REPO
 
 git add .
 git commit -F- <<EOF
-autocommit: update usc $(date +"%Y-%m-%d")
+$commit_msg
 
-Automated commit to sync USC repo with the latest data.
-$(date)
+$description
 EOF
 
 cd -

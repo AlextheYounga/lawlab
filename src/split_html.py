@@ -42,7 +42,7 @@ def handle_appendix(doc, soup: BeautifulSoup) -> None:
     that ends with _appendix.html.
     """
     # Have to load main title to get expcite
-    main_title = doc.replace('a.htm', '.htm')
+    main_title = re.sub(r"\d+a", r"\1", doc) # Load the title with the a removed
     main_path = Path(f'storage/usc/{main_title}')
     main_content = open(main_path, 'rb').read()
     main_soup = BeautifulSoup(main_content, 'html.parser')  
@@ -74,11 +74,13 @@ def find_document_id(tag):
     raise Exception('Could not find document id for item.')
 
 def split_html(doc: str):
+    if not doc.endswith('.htm'): return
     doc_path = Path(f'storage/usc/{doc}')
     doc_content = open(doc_path, 'rb').read()
     soup = BeautifulSoup(doc_content, 'html.parser')
+    doc_title = soup.find('h1', class_="usc-title-head")
 
-    if 'a.htm' in doc: 
+    if 'appendix' in doc_title.lower(): 
         return handle_appendix(doc, soup)
     
     content_str = str(soup)
