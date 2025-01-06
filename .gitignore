@@ -6,6 +6,7 @@ irc/**
 storage/usc/**
 storage/*.zip
 storage/xml_usc/**
+archive/**
 out/**
 __MACOSX
 deprecated.md

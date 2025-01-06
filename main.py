@@ -3,7 +3,7 @@ import time
 import multiprocessing
 import shutil
 from pathlib import Path
-from src.download_code import download_code
+from src.download_code import update_release_register, download_code
 from src.file_monitor import html_file_monitor, markdown_file_monitor	
 from src.split_html import split_html
 from src.convert_to_markdown import convert_to_markdown
@@ -13,10 +13,31 @@ load_dotenv()
 PROCESSES = int(os.environ.get('PROCESSES', 4))
 USC_REPO = os.environ.get('USC_REPO', None)
 
-def handle_html_files():
+def run_preflight():
     # Unzip the usc files
     os.system('rm -rf out/templates/html')
     os.system('unzip -o storage/usc.zip -d storage/usc')
+    # Remove previous output
+    os.system('rm -rf out/usc')
+    os.system('rm -rf out/templates/markdown')
+    
+def handle_html_files():
+      # Split HTML documents based on chapters and prune unnecessary tags from the content
+    export_files = os.listdir('storage/usc')
+    for file in export_files:
+        print(f'Processing {file}...')
+        split_html(file)
+        
+def handle_markdown_conversion():
+    # Convert HTML files to markdown
+    html_files = os.listdir('out/templates/html')
+    os.makedirs('out/templates/markdown', exist_ok=True)	
+    for file in html_files:
+        print(f'Processing {file}...')
+        convert_to_markdown(file)
+
+def handle_html_files_async():
+    # Split HTML documents based on chapters and prune unnecessary tags from the content
     monitor_process = multiprocessing.Process(target=html_file_monitor)
     monitor_process.start()
     try:
@@ -32,9 +53,8 @@ def handle_html_files():
     print('Done processing HTML files')
     monitor_process.kill()
 
-def handle_markdown_conversion():
-    os.system('rm -rf out/usc')
-    os.system('rm -rf out/templates/markdown')
+def handle_markdown_conversion_async():
+    # Convert HTML files to markdown
     monitor_process = multiprocessing.Process(target=markdown_file_monitor)
     monitor_process.start()
     try:
@@ -56,43 +76,37 @@ def cleanup():
     os.system('cd out/templates/ && zip -qrq html.zip html')
     os.system('rm -rf out/templates/markdown')
     os.system('rm -rf out/templates/html')
-    
+
 
 def main():
-    time_start = time.time()    
+    releases = update_release_register()
+    inversed_keys = list(releases.keys())[::-1]
 
-    # Split HTML documents based on chapters and prune unnecessary tags from the content
-    handle_html_files()
+    for release in inversed_keys:
+        time_start = time.time()   
+        # Download the code from https://uscode.house.gov/download/download.shtml
+        download_code(release['link'])
 
-    # Convert HTML files to markdown
-    handle_markdown_conversion()
+        # Preflight: unzip the usc files and remove previous output.
+        run_preflight()
 
-    if USC_REPO:
-        os.system(f'rm -rf {USC_REPO}/usc')
-        shutil.copytree('out/usc', f"{USC_REPO}/usc")
+        # Handle file conversions.
+        handle_html_files_async()
+        handle_markdown_conversion_async()
+        
+        # Remove some temporary files and zip to save space.
+        cleanup()
 
-    cleanup()
+        # We copy the output to our public repo here.
+        if USC_REPO:
+            os.system(f'rm -rf {USC_REPO}/usc')
+            shutil.copytree('out/usc', f"{USC_REPO}/usc")
 
-    end_time = time.time()  
-    print(f'\nDone! Time taken: {end_time - time_start:.2f} seconds')
-
-
-def test_sync():
-    # Unzip the usc files
-    os.system('rm -rf out/templates/html')
-    os.system('unzip -o storage/usc.zip -d storage/usc')
-
-    export_files = os.listdir('storage/usc')
-    os.makedirs('out/templates/html', exist_ok=True)
-    for doc in export_files:
-        print(f'Processing {doc}...')
-        split_html(doc)
+        end_time = time.time()  
+        print(f'\nDone! Time taken: {end_time - time_start:.2f} seconds')
 
 
 if __name__ == '__main__':
-    # Download the code from https://uscode.house.gov/download/download.shtml
-    download_code()
     main()
-    # test_sync()
 
 
