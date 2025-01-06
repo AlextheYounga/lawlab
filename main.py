@@ -2,6 +2,7 @@ import os
 import time
 import multiprocessing
 import shutil
+import redis
 from src.download_code import sync_release_register, download_code, update_release_register
 from src.file_monitor import html_file_monitor, markdown_file_monitor	
 from src.split_html import split_html, split_html_async
@@ -9,11 +10,14 @@ from src.convert_to_markdown import convert_to_markdown, convert_to_markdown_asy
 from dotenv import load_dotenv  
 
 load_dotenv()
+
+r = redis.Redis(host='localhost', port=6379, db=0)
 PROCESSES = int(os.environ.get('PROCESSES', 4))
 USC_REPO = os.environ.get('USC_REPO', None)
 
 def run_preflight(release_id):
 	# Unzip the usc files
+	r.flushall()
 	os.system('rm -rf out/templates/html')
 	os.system(f'unzip -o storage/{release_id}.zip -d storage/usc')
 	# Remove previous output
