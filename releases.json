@@ -2411,7 +2411,7 @@
         "link": "https://uscode.house.gov/download/releasepoints/us/pl/113/21/usc-rp@113-21.htm",
         "description": "Public Law 113-21 (07/18/2013), affecting titles 5, 16, 18, 22, 33, 36, and 50",
         "date": "2013-07-18",
-        "synced": false,
+        "synced": true,
         "id": "usc-rp@113-21"
     }
 }
