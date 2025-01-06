@@ -18,7 +18,6 @@ def fetch_release_points():
 	releases = {}
 	for release_point in release_point_items:
 		atag = release_point.find("a")
-		print(atag.text)
 		date_match = re.findall(r'(\d{1,2})/(\d{1,2})/(\d{4})', atag.text)
 		date = None
 		if date_match:
@@ -53,8 +52,8 @@ def update_release_register():
 	return latest_releases
 
 
-def download_code(download_url):
+def download_code(download_url, release_id):
 	print(f"Downloading US Code {download_url}...")
 	response = requests.get(download_url)
-	with open("storage/usc.zip", "wb") as f:
+	with open(f"storage/{release_id}.zip", "wb") as f:
 		f.write(response.content)

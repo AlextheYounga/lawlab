@@ -13,17 +13,17 @@ load_dotenv()
 PROCESSES = int(os.environ.get('PROCESSES', 4))
 USC_REPO = os.environ.get('USC_REPO', None)
 
-def run_preflight():
+def run_preflight(release_id):
     # Unzip the usc files
     os.system('rm -rf out/templates/html')
-    os.system('unzip -o storage/usc.zip -d storage/usc')
+    os.system(f'unzip -o storage/{release_id}.zip -d storage/usc')
     # Remove previous output
     os.system('rm -rf out/usc')
     os.system('rm -rf out/templates/markdown')
     
-def handle_html_files():
+def handle_html_files(release_id):
       # Split HTML documents based on chapters and prune unnecessary tags from the content
-    export_files = os.listdir('storage/usc')
+    export_files = os.listdir(f'storage/{release_id}')
     for file in export_files:
         print(f'Processing {file}...')
         split_html(file)
@@ -36,12 +36,12 @@ def handle_markdown_conversion():
         print(f'Processing {file}...')
         convert_to_markdown(file)
 
-def handle_html_files_async():
+def handle_html_files_async(release_id):
     # Split HTML documents based on chapters and prune unnecessary tags from the content
     monitor_process = multiprocessing.Process(target=html_file_monitor)
     monitor_process.start()
     try:
-        export_files = os.listdir('storage/usc')
+        export_files = os.listdir(f'storage/{release_id}')
         os.makedirs('out/templates/html', exist_ok=True)
         with multiprocessing.Pool(PROCESSES) as pool:
             for result in pool.imap_unordered(split_html, export_files):
@@ -80,18 +80,20 @@ def cleanup():
 
 def main():
     releases = update_release_register()
-    inversed_keys = list(releases.keys())[::-1]
-
-    for release in inversed_keys:
+    inversed_releases = list(releases.keys())[::-1]
+    
+    for id in inversed_releases:
+        print(f'\nProcessing release: {id}')
+        release = releases[id]
         time_start = time.time()   
         # Download the code from https://uscode.house.gov/download/download.shtml
-        download_code(release['link'])
+        download_code(release['link'], id)
 
         # Preflight: unzip the usc files and remove previous output.
-        run_preflight()
+        run_preflight(id)
 
         # Handle file conversions.
-        handle_html_files_async()
+        handle_html_files_async(id)
         handle_markdown_conversion_async()
         
         # Remove some temporary files and zip to save space.
@@ -104,7 +106,7 @@ def main():
 
         end_time = time.time()  
         print(f'\nDone! Time taken: {end_time - time_start:.2f} seconds')
-
+        break
 
 if __name__ == '__main__':
     main()
