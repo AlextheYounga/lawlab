@@ -5,6 +5,9 @@ import datetime
 from urllib.parse import urljoin
 from bs4 import BeautifulSoup
 
+BAD_RELEASES = [
+	'usc-rp@113-185u1'
+]
 
 def fetch_release_points():
 	# Get the download link
@@ -31,6 +34,7 @@ def fetch_release_points():
 			"synced": False,
 		}
 		release_id = release["link"].split("/")[-1].split(".")[0]
+		if release_id in BAD_RELEASES: continue
 		release["id"] = release_id
 		releases[release_id] = release
 
@@ -65,9 +69,13 @@ def download_code(link, release_id):
 	print("Fetching US Code download link...")
 	response = requests.get(link)
 	soup = BeautifulSoup(response.content, "html.parser")
-	selector = "#content > div > div > div.uscitemlist > div:nth-child(1) > div.itemdownloadlinks > a:nth-child(2)"
-	html_link = soup.select(selector)[0]
-	download_slug = html_link.get("href")
+	download_slug = None
+	for a in soup.find_all('a'): # Find first XHTML link
+		if "XHTML" in a.get_text():
+			download_slug = a.get('href')
+			break
+	if not download_slug:
+		raise Exception("No download link found")
 	download_url = urljoin(link, download_slug)
 	print(f"Downloading US Code {download_slug}...")
 	response = requests.get(download_url)

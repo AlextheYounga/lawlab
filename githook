@@ -1,4 +1,5 @@
-source ./.env
+#!/bin/bash
+source .env
 
 commit_msg=$1
 description=$2

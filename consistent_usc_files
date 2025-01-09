@@ -1,0 +1,10 @@
+#!/bin/bash
+
+usc_files=$(find ./storage/ -type f -name '*.htm')
+
+# Flatten the directory structure
+for usc_file in $usc_files
+do
+	new_location=./storage/usc/$(basename $usc_file)
+	mv $usc_file $new_location &>/dev/null
+done
