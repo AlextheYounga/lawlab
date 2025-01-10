@@ -1,43 +1,29 @@
 import os
 import time
-import multiprocessing
 import shutil
-import redis
-from pathlib import Path
 import subprocess
 from src.download_code import sync_release_register, download_code, update_release_register
-from src.file_monitor import html_file_monitor, markdown_file_monitor	
-from src.split_html import split_html, split_html_async
 from dotenv import load_dotenv  
 
 load_dotenv()
 
-r = redis.Redis(host='localhost', port=6379, db=0)
 PROCESSES = int(os.environ.get('PROCESSES', 4))
 USC_REPO = os.environ.get('USC_REPO', None)
 
 def run_preflight(release_id):
-	# Unzip the usc files
-	r.flushall()
-	os.system('rm -rf out/templates/html')
-	os.system('rm -rf out/templates/markdown')
 	os.system(f'unzip -o storage/{release_id}.zip -d storage/usc')
 	os.system('rm -rf out/usc')
-	# Recursively find the htm files
-	subprocess.run("./consistent_usc_files", shell=True)
+	# Ensure downloaded files have consistent structure
+	subprocess.run("./consistent_usc_files", shell=True) 
 
 def pass_to_rust_handler():
 	# Crazy fast
 	print('Handing off to Rust to convert to Markdown...')
 	return subprocess.run('./target/release/markdownconverter')
 
-
 def cleanup():
 	os.system('rm -rf storage/usc')
 	os.system('rm -rf storage/__MACOSX')
-	os.system('rm -rf out/templates/markdown')
-	os.system('rm -rf out/templates/html')
-
 
 def handle_usc_repository_functions(release):
 	if not USC_REPO: return

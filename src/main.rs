@@ -1,12 +1,12 @@
 use std::fs;
 use std::fs::File;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::io::{ self, Write };
 use std::borrow::Cow;
 use html2md::parse_html;
 use rayon::prelude::*;
 use scraper::{ Html, Selector, ElementRef };
-use regex::Regex;
+// use regex::Regex;
 
 fn write_to_file(filepath: String, buffer: Vec<u8>) -> io::Result<()> {
     let mut file = File::create(filepath)?;
@@ -15,11 +15,13 @@ fn write_to_file(filepath: String, buffer: Vec<u8>) -> io::Result<()> {
 }
 
 fn create_out_dirs(filepath: &String) -> io::Result<()> {
-    fs::create_dir_all(filepath)?;
+	let path = Path::new(filepath);
+	let dir_path = path.parent().unwrap();
+    fs::create_dir_all(dir_path)?;
     Ok(())
 }
 
-fn format_citation_comment(citation: &str) -> String {
+fn format_expcite_comment(citation: &str) -> String {
     return String::from(citation)
         .to_lowercase()
         .trim()
@@ -47,7 +49,7 @@ fn format_citation_comment(citation: &str) -> String {
 
 //     for line in main_doc_string.lines() {
 //         if line.contains("expcite") {
-//             let citation = format_citation_comment(line);
+//             let citation = format_expcite_comment(line);
 //             let file_path = citation + "/appendix";
 //             // write to file
 //         }
@@ -55,12 +57,13 @@ fn format_citation_comment(citation: &str) -> String {
 // }
 
 fn find_section_path(section_element: ElementRef<'_>) -> String {
+	// Finds first expcite comment above element.
 	let mut section_path = String::new();
-    for element in section_element.ancestors() {
-        if element.value().is_comment() && element.value().as_text().is_some() {
-			if element.value().as_text().unwrap().contains("expcite") {
-				let item_citation: String = element.value().as_text().unwrap().to_string();
-				section_path = format_citation_comment(&item_citation);
+    for element in section_element.prev_siblings() {
+        if let Some(comment) = element.value().as_comment() {
+			if comment.contains("expcite") {
+				let item_citation = comment.to_string();
+				section_path = format_expcite_comment(&item_citation);
 				break;
 			}
         }
@@ -69,11 +72,12 @@ fn find_section_path(section_element: ElementRef<'_>) -> String {
 }
 
 fn find_document_id(section_element: ElementRef<'_>) -> String {
+	// Finds first documentid above element.
 	let mut document_id = String::new();
-    for element in section_element.ancestors() {
-        if element.value().is_comment() && element.value().as_text().is_some() {
-            if element.value().as_text().unwrap().contains("documentid") {
-                let item_citation: String = element.value().as_text().unwrap().to_string();
+    for element in section_element.prev_siblings() {
+        if let Some(comment) = element.value().as_comment() {
+			if comment.contains("documentid") {
+                let item_citation: String = comment.to_string();
 				document_id = item_citation
 					.split("documentid:")
 					.nth(1)
@@ -139,12 +143,12 @@ fn main() {
 				let section_path = find_section_path(section_element);
 				let document_id = find_document_id(section_element);
 	
-				section_vec.push([document_id, section_path, section_content])
+				section_vec.push([document_id, section_path, section_content]);
 			}
 	
 			// Run in parallel to convert to markdown
 			section_vec.par_iter().for_each(|doc_items| {
-				let doc_id = &doc_items[0];
+				// let doc_id = &doc_items[0];
 				let section_path = &doc_items[1];
 				let section_content = &doc_items[2];
 
@@ -154,10 +158,9 @@ fn main() {
 				let out_path = String::from("out/usc/") + section_path + ".md";
 
 				if create_out_dirs(&out_path).is_ok() {
-					// println!("Would output {}", &out_path);
-					// if let Err(e) = write_to_file(mdfilename, buffer) {
-					// 	eprintln!("Error writing to file: {}", e);
-					// }
+					if let Err(e) = write_to_file(out_path, buffer) {
+						eprintln!("Error writing to file: {}", e);
+					}
 				}
 
 			})
