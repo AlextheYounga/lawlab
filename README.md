@@ -4,5 +4,14 @@ From https://uscode.house.gov/download/download.shtml
 
 ## Getting Started
 
-Build the maturin library so Python can talk to Rust
-`maturin develop --release` 
+Build the Rust target library
+
+`cargo build --release` 
+
+Install Python packages
+
+`pip install -r requirements.txt`
+
+Run the converter
+
+`python main.py`
