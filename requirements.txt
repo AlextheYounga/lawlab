@@ -1,6 +1,3 @@
 beautifulsoup4
 requests
-pandoc
-git+https://github.com/AlextheYounga/python-markdownify.git
 python-dotenv
-redis

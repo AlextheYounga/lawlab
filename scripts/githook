@@ -1,4 +1,5 @@
 #!/bin/bash
+
 source .env
 
 commit_msg=$1
@@ -12,5 +13,8 @@ $commit_msg
 
 $description
 EOF
+
+# Manual housekeeping
+git prune 
 
 cd -

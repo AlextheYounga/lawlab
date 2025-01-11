@@ -14,9 +14,9 @@ def run_preflight(release_id):
 	os.system(f'unzip -o storage/{release_id}.zip -d storage/usc')
 	os.system('rm -rf out/usc')
 	# Ensure downloaded files have consistent structure
-	subprocess.run("./consistent_usc_files", shell=True) 
+	subprocess.run("./scripts/consistent_usc_files", shell=True) 
 
-def pass_to_rust_handler():
+def rust_convert_to_markdown():
 	# Crazy fast
 	print('Handing off to Rust to convert to Markdown...')
 	return subprocess.run('./target/release/markdownconverter')
@@ -31,7 +31,7 @@ def handle_usc_repository_functions(release):
 	shutil.copytree('out/usc', f"{USC_REPO}/usc")
 	commit_msg = f"release: {release['id']} - {release['date']}"
 	description = f"USC repository update\n{release['description']}\n{release['link']}"
-	subprocess.run(f"./githook '{commit_msg}' '{description}'", shell=True)
+	subprocess.run(f"./scripts/githook '{commit_msg}' '{description}'", shell=True)
 
 def main():
 	releases = sync_release_register()
@@ -41,30 +41,25 @@ def main():
 		print(f'\nProcessing release: {id}')
 		release = releases[id]
 		if release['synced']: continue
-		
+
+		# Check for existing download
 		existing_download = os.path.exists(f'storage/{id}.zip')   
 		if not existing_download:
 			download_code(release['link'], id)
 		else:
 			print('Code already downloaded.')
 
+		# Begin main program
 		time_start = time.time() 
-		# Preflight: unzip the usc files and remove previous output.
 		run_preflight(id)
-
-		pass_to_rust_handler()
-
-		# handle_markdown_conversion_async()
+		rust_convert_to_markdown() # Pass off to Rust program
 		end_time = time.time() # Time the main program
 		print(f'\nDone! Time taken: {end_time - time_start:.2f} seconds')
 		
-		# Remove some temporary files and zip to save space.
-		# cleanup()
-		# update_release_register(id)
-		# handle_usc_repository_functions(release)
-		break
+		cleanup() # Remove some temporary files and zip to save space.
+		update_release_register(id) # Update releases.json
+		handle_usc_repository_functions(release) # Copy out/usc to main repo and commit
 		
-
 if __name__ == '__main__':
 	main()
 
