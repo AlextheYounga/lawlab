@@ -1,12 +1,11 @@
 use std::fs;
 use std::fs::File;
-use std::path::{Path, PathBuf};
+use std::path::{ Path, PathBuf };
 use std::io::{ self, Write };
 use std::borrow::Cow;
 use html2md::parse_html;
 use rayon::prelude::*;
-use scraper::{ Html, Selector, ElementRef };
-// use regex::Regex;
+use regex::Regex;
 
 fn write_to_file(filepath: String, buffer: Vec<u8>) -> io::Result<()> {
     let mut file = File::create(filepath)?;
@@ -15,14 +14,14 @@ fn write_to_file(filepath: String, buffer: Vec<u8>) -> io::Result<()> {
 }
 
 fn create_out_dirs(filepath: &String) -> io::Result<()> {
-	let path = Path::new(filepath);
-	let dir_path = path.parent().unwrap();
+    let path = Path::new(filepath);
+    let dir_path = path.parent().unwrap();
     fs::create_dir_all(dir_path)?;
     Ok(())
 }
 
-fn format_expcite_comment(citation: &str) -> String {
-    return String::from(citation)
+fn create_document_path(expcite: &str) -> String {
+    return String::from(expcite)
         .to_lowercase()
         .trim()
         .replace(" ", "-")
@@ -33,137 +32,84 @@ fn format_expcite_comment(citation: &str) -> String {
         .replace("!@!", "/");
 }
 
-// fn handle_appendix(doc_path: PathBuf, doc_html: Html) {
-//     /* The correct title name is not found in the appendix file itself,
-// 	so I have to find the correct title document by removing the "a" after the title number.
-// 	 */
-//     let re: Regex = Regex::new(r"\d+a").unwrap();
-//     let doc_name: Cow<'_, str> = doc_path.to_string_lossy();
-//     let title_id = re.find(&doc_name).unwrap();
-//     let title_number = title_id.as_str().replace("a", "");
-//     let main_doc_location = doc_name.replace(title_id.as_str(), &title_number);
-//     let main_doc_bytes = fs
-//         ::read(main_doc_location)
-//         .expect("Should have been able to read the file");
-//     let main_doc_string = String::from_utf8_lossy(&main_doc_bytes);
-
-//     for line in main_doc_string.lines() {
-//         if line.contains("expcite") {
-//             let citation = format_expcite_comment(line);
-//             let file_path = citation + "/appendix";
-//             // write to file
-//         }
-//     }
-// }
-
-fn find_section_path(section_element: ElementRef<'_>) -> String {
-	// Finds first expcite comment above element.
-	let mut section_path = String::new();
-    for element in section_element.prev_siblings() {
-        if let Some(comment) = element.value().as_comment() {
-			if comment.contains("expcite") {
-				let item_citation = comment.to_string();
-				section_path = format_expcite_comment(&item_citation);
-				break;
-			}
-        }
-    }
-	return section_path;
+fn get_expcite(text: &str) -> &str {
+    return text.split_once("<!-- expcite:").unwrap().1.split_once("-->").unwrap().0.trim();
 }
 
-fn find_document_id(section_element: ElementRef<'_>) -> String {
-	// Finds first documentid above element.
-	let mut document_id = String::new();
-    for element in section_element.prev_siblings() {
-        if let Some(comment) = element.value().as_comment() {
-			if comment.contains("documentid") {
-                let item_citation: String = comment.to_string();
-				document_id = item_citation
-					.split("documentid:")
-					.nth(1)
-					.unwrap()
-					.split(" ")
-					.nth(0)
-					.unwrap()
-					.trim()
-					.to_string();
-				break;
-            }
+fn convert_to_markdown(filepath: &str, contents: String) {
+    let markdown = parse_html(&contents);
+    let buffer = markdown.into_bytes();
+    let out_path = String::from("out/usc/") + filepath + ".md";
+
+    if create_out_dirs(&out_path).is_ok() {
+        if let Err(e) = write_to_file(out_path, buffer) {
+            eprintln!("Error writing to file: {}", e);
         }
     }
-	return document_id;
+}
+
+fn handle_appendix(title_path: PathBuf, contents: String) {
+    /* The correct title name is not found in the appendix file itself,
+	so I have to find the correct title document by removing the "a" after the title number.
+	 */
+    let re: Regex = Regex::new(r"\d+a").unwrap();
+    let title_doc_name: Cow<'_, str> = title_path.to_string_lossy();
+    let title_id = re.find(&title_doc_name).unwrap();
+    let title_number = title_id.as_str().replace("a", "");
+    let main_title_location = title_doc_name.replace(title_id.as_str(), &title_number);
+    let main_title_bytes = fs
+        ::read(main_title_location)
+        .expect("Should have been able to read the file");
+    let main_title_contents = String::from_utf8_lossy(&main_title_bytes);
+    let doc_cite = get_expcite(&main_title_contents);
+    let filepath = create_document_path(doc_cite) + "/appendix";
+    return convert_to_markdown(&filepath, contents);
 }
 
 fn main() {
-    let docs: Vec<PathBuf> = fs
+    let titles: Vec<PathBuf> = fs
         ::read_dir("./storage/usc")
         .unwrap()
         .filter_map(|entry| entry.ok().map(|e| e.path()))
         .collect();
 
-    for doc_path in docs {
-		let doc_name: Cow<'_, str> = doc_path.to_string_lossy();
-		if doc_name.ends_with(".htm") {
-			let doc_bytes = fs::read(&doc_path).expect("Should have been able to read the file");
-			let doc_contents: Cow<'_, str> = String::from_utf8_lossy(&doc_bytes);
-			let doc_html: Html = Html::parse_document(&doc_contents);
-			let title_head_selector: Selector = Selector::parse("h1.usc-title-head").unwrap();
-			let title_element: ElementRef<'_> = doc_html.select(&title_head_selector).next().unwrap();
-			let title: String = String::from(title_element.inner_html().as_str());
-			println!("{}", title);
-	
-			if title.contains("APPENDIX") {
-				continue;
-				// return handle_appendix(doc_path, doc_html);
-			}
-	
-			let section_selector = Selector::parse("h3.section-head").unwrap();
-			let mut section_elements = doc_html.select(&section_selector);
-			let mut sections = doc_contents.split("<h3 class=\"section-head\">");
-			// Pop the first value
-			let mut front_matter = "";
-			if let Some(first_value) = sections.next() {
-				front_matter = first_value;
-			}
-	
-			// Map out all the html we'll need before converting.
-			let mut section_vec: Vec<[String; 3]> = Vec::new();
-			let sections_count = sections.clone().count();
-			for (i, section) in sections.into_iter().enumerate() {
-				let section_element = section_elements.next().unwrap();
-				let mut section_content = section_element.html() + section;
-				if i == 0 {
-					section_content.insert_str(0, front_matter); // that's dumb...
-				}
-				if i == sections_count - 1 {
-					section_content.insert_str(0, "<html><body><div>");
-				}
-	
-				// Get item "citation" from document which contains the path.
-				let section_path = find_section_path(section_element);
-				let document_id = find_document_id(section_element);
-	
-				section_vec.push([document_id, section_path, section_content]);
-			}
-	
-			// Run in parallel to convert to markdown
-			section_vec.par_iter().for_each(|doc_items| {
-				// let doc_id = &doc_items[0];
-				let section_path = &doc_items[1];
-				let section_content = &doc_items[2];
+    for title_path in titles {
+        let title_doc_name: Cow<'_, str> = title_path.to_string_lossy();
+        if title_doc_name.ends_with(".htm") {
+            let title_bytes: Vec<u8> = fs
+                ::read(&title_path)
+                .expect("Should have been able to read the file");
+            let title_contents: Cow<'_, str> = String::from_utf8_lossy(&title_bytes);
+            let title_name = get_expcite(&title_contents);
+            println!("{}", title_name);
 
-				// Convert to markdown
-            	let markdown = parse_html(&section_content);
-            	let buffer = markdown.into_bytes();
-				let out_path = String::from("out/usc/") + section_path + ".md";
+            if title_name.contains("APPENDIX") {
+                handle_appendix(title_path, title_contents.to_string());
+                continue;
+            }
 
-				if create_out_dirs(&out_path).is_ok() {
-					if let Err(e) = write_to_file(out_path, buffer) {
-						eprintln!("Error writing to file: {}", e);
-					}
-				}
-
-			})
-		}
+            let documents = title_contents.split("<!-- documentid");
+            documents
+                .enumerate()
+                .par_bridge()
+                .into_par_iter()
+                .for_each(|(index, doc)| {
+                    if index > 0 {
+                        // Skip the first
+                        let doc_cite = get_expcite(doc);
+                        let mut filepath = create_document_path(doc_cite);
+                        if doc_cite.contains("!@!Sec.") {
+                            // Section document
+                            let contents = String::from("<!-- documentid") + doc;
+                            convert_to_markdown(&filepath, contents);
+                        } else {
+                            // Front matter
+                            let contents = String::from("<!-- documentid") + doc;
+                            filepath += "/frontmatter";
+                            convert_to_markdown(&filepath, contents);
+                        }
+                    }
+                });
+        }
     }
 }
