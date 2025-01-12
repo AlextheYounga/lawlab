@@ -7,14 +7,19 @@ description=$2
 
 cd $USC_REPO
 
+echo "Adding files to git..."
 git add .
-git commit -F- <<EOF
+
+echo "Committing files to git..."
+git commit --quiet -F- <<EOF
 $commit_msg
 
 $description
 EOF
 
+git diff HEAD^ --shortstat
+
 # Cleanup command
-git -c gc.reflogExpire=0 -c gc.reflogExpireUnreachable=0 -c gc.rerereresolved=0 -c gc.rerereunresolved=0 -c gc.pruneExpire=now gc
+# git -c gc.reflogExpire=0 -c gc.reflogExpireUnreachable=0 -c gc.rerereresolved=0 -c gc.rerereunresolved=0 -c gc.pruneExpire=now gc
 
 cd -

@@ -33,7 +33,7 @@ def handle_usc_repository_functions(release):
 	print('Copying out/usc to main repository...')
 	os.system(f'rm -rf {USC_REPO}/usc')
 	os.system(f'mv out/usc {USC_REPO}/')
-	print('Running git commands. Please don\'t terminate until this step is complete...')
+	print('Running git commands... Terminate at your own risk during this step.')
 	commit_msg = f"release: {release['id']} - {release['date']}"
 	description = f"USC repository update\n{release['description']}\n{release['link']}"
 	subprocess.run(f"./scripts/githook '{commit_msg}' '{description}'", shell=True)

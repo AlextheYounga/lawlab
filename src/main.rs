@@ -1,24 +1,12 @@
+mod convert_to_markdown;
+mod html_corrections;
 use std::fs;
-use std::fs::File;
-use std::path::{ Path, PathBuf };
-use std::io::{ self, Write };
+use std::path::PathBuf;
 use std::borrow::Cow;
-use html2md::parse_html;
 use rayon::prelude::*;
 use regex::Regex;
-
-fn write_to_file(filepath: String, buffer: Vec<u8>) -> io::Result<()> {
-    let mut file = File::create(filepath)?;
-    file.write_all(&buffer)?;
-    Ok(())
-}
-
-fn create_out_dirs(filepath: &String) -> io::Result<()> {
-    let path = Path::new(filepath);
-    let dir_path = path.parent().unwrap();
-    fs::create_dir_all(dir_path)?;
-    Ok(())
-}
+use convert_to_markdown::convert_to_markdown;
+use html_corrections::handle_html_corrections;
 
 fn create_document_path(expcite: &str) -> String {
     return String::from(expcite)
@@ -36,18 +24,6 @@ fn get_expcite(text: &str) -> &str {
     return text.split_once("<!-- expcite:").unwrap().1.split_once("-->").unwrap().0.trim();
 }
 
-fn convert_to_markdown(filepath: &str, contents: String) {
-    let markdown = parse_html(&contents);
-    let buffer = markdown.into_bytes();
-    let out_path = String::from("out/usc/") + filepath + ".md";
-
-    if create_out_dirs(&out_path).is_ok() {
-        if let Err(e) = write_to_file(out_path, buffer) {
-            eprintln!("Error writing to file: {}", e);
-        }
-    }
-}
-
 fn handle_appendix(title_path: PathBuf, contents: String) {
     /* The correct title name is not found in the appendix file itself,
 	so I have to find the correct title document by removing the "a" after the title number.
@@ -63,7 +39,8 @@ fn handle_appendix(title_path: PathBuf, contents: String) {
     let main_title_contents = String::from_utf8_lossy(&main_title_bytes);
     let doc_cite = get_expcite(&main_title_contents);
     let filepath = create_document_path(doc_cite) + "/appendix";
-    return convert_to_markdown(&filepath, contents);
+    let corrected_contents = handle_html_corrections(&contents);
+    return convert_to_markdown(&filepath, corrected_contents);
 }
 
 fn main() {
@@ -94,19 +71,19 @@ fn main() {
                 .par_bridge()
                 .into_par_iter()
                 .for_each(|(index, doc)| {
+                    // Skip the first
                     if index > 0 {
-                        // Skip the first
                         let doc_cite = get_expcite(doc);
                         let mut filepath = create_document_path(doc_cite);
+                        let contents = String::from("<!-- documentid") + doc;
+                        let corrected_contents = handle_html_corrections(&contents);
                         if doc_cite.contains("!@!Sec.") {
                             // Section document
-                            let contents = String::from("<!-- documentid") + doc;
-                            convert_to_markdown(&filepath, contents);
+                            convert_to_markdown(&filepath, corrected_contents);
                         } else {
                             // Front matter
-                            let contents = String::from("<!-- documentid") + doc;
                             filepath += "/frontmatter";
-                            convert_to_markdown(&filepath, contents);
+                            convert_to_markdown(&filepath, corrected_contents);
                         }
                     }
                 });
