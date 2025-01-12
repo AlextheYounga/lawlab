@@ -6,7 +6,6 @@ from dotenv import load_dotenv
 from termcolor import colored
 load_dotenv()
 
-PROCESSES = int(os.environ.get('PROCESSES', 4))
 USC_REPO = os.environ.get('USC_REPO', None)
 
 def run_preflight(release_id):
